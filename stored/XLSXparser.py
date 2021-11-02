@@ -39,21 +39,24 @@ def parse_keyword(df1):
             is_active = False
 
         keyword_id = query_keyword_id(keyword)
+
         if keyword_id is None:
             update_on_dupkey(Keyword, {'word': keyword, 'type': match_type,
                                        'is_active': is_active, 'created_time': datetime.datetime.now()})
         else:
-            update_on_dupkey(Keyword, {'id': keyword_id[0], 'type': match_type,
+            update_on_dupkey(Keyword, {'id': keyword_id[0], 'word': keyword, 'type': match_type,
                                        'is_active': is_active, 'created_time': datetime.datetime.now()})
+
         keyword_id = query_keyword_id(keyword)
         adgroup_id = query_adgroup_id(row['Ad group'])
         search_id = query_search_id(keyword_id[0])
         if search_id is None:
-            update_on_dupkey(SearchKeyTerm, {'keyword_id': keyword_id, 'ad_group_id': adgroup_id[0],
-                                             'created_time': datetime.datetime.now()})
+            update_on_dupkey_search(SearchKeyTerm, {'keyword_id': keyword_id[0], 'ad_group_id': adgroup_id[0],
+                                                    'created_time': datetime.datetime.now()})
         else:
-            update_on_dupkey(SearchKeyTerm, {'id': search_id, 'ad_group_id': adgroup_id,
-                                             'created_time': datetime.datetime.now()})
+            update_on_dupkey_search(SearchKeyTerm, {'id': search_id[0], 'keyword_id': keyword_id[0],
+                                                    'ad_group_id': adgroup_id[0],
+                                                    'created_time': datetime.datetime.now()})
 
 
 def parse_negative_keyword(df1):
@@ -68,14 +71,15 @@ def parse_negative_keyword(df1):
         else:
             match_type = None
 
-        keyword_id = query_keyword_id(row['Negative keyword'])
+        keyword = row['Negative keyword'][1:-1]
+        keyword_id = query_keyword_id(keyword)
         if keyword_id is None:
-            update_on_dupkey(Keyword, {'word': row['Negative keyword'], 'type': match_type,
+            update_on_dupkey(Keyword, {'word': keyword, 'type': match_type,
                                        'created_time': datetime.datetime.now()})
         else:
-            update_on_dupkey(Keyword, {'id': keyword_id[0], 'word': row['Negative keyword'],
+            update_on_dupkey(Keyword, {'id': keyword_id[0], 'word': keyword,
                                        'type': match_type, 'created_time': datetime.datetime.now()})
-        keyword_id = query_keyword_id(row['Negative keyword'])
+        keyword_id = query_keyword_id(keyword)
         campaign_id = query_campaign_id(row['Campaign'])
         ad_group_id = query_adgroup_id(row['Ad group'])
         if campaign_id is not None:
@@ -103,15 +107,30 @@ def parse_search_term(df1):
         else:
             match_type = None
 
-        if row["Added/Excluded"] == "Added":
+        if "added" in row["Added/Excluded"].lower():
             is_added = True
         else:
-            id_added = False
+            is_added = False
 
-        update_on_dupkey(Keyword, {'word': row['Search term'], 'type': match_type,
-                                   'is_active': is_added, 'created_time': datetime.datetime.now()})
-        term_id = query_keyword_id(row['Search term'])
-        adgroup_id = query_adgroup_id(row['Ad group'])
-        update_on_dupkey_search(SearchKeyTerm, {'keyword_id': term_id, 'ad_group_id': adgroup_id,
-                                                'created_time': datetime.datetime.now()})
+        keyword_id = query_keyword_id(row['Search term'])
+        if keyword_id is None:
+            update_on_dupkey(Keyword, {'word': row['Search term'], 'type': match_type,
+                                       'is_active': is_added, 'created_time': datetime.datetime.now()})
+        else:
+            update_on_dupkey(Keyword, {'id': keyword_id[0], 'word': row['Search term'], 'type': match_type,
+                                       'is_active': is_added, 'created_time': datetime.datetime.now()})
+
+        keyword_id = query_keyword_id(row['Search term'])
+        ad_group_id = query_adgroup_id(row['Ad group'])
+        if ad_group_id is not None:
+            ad_group_id = ad_group_id[0]
+        term_id = query_search_id(keyword_id[0])
+        if term_id is None:
+            update_on_dupkey_search(SearchKeyTerm, {'keyword_id': keyword_id[0],
+                                                    'ad_group_id': ad_group_id,
+                                                    'created_time': datetime.datetime.now()})
+        else:
+            update_on_dupkey_search(SearchKeyTerm, {'id': term_id[0], 'keyword_id': keyword_id[0],
+                                                    'ad_group_id': ad_group_id,
+                                                    'created_time': datetime.datetime.now()})
 
