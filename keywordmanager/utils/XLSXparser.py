@@ -137,6 +137,10 @@ def parse_search_term(df1):
     df1.loc[df1['Match type'].str.contains('broad', case=False), 'Match type'] = 'broad'
     df1.loc[df1['Match type'].str.contains('exact', case=False), 'Match type'] = 'exact'
     df1.loc[df1['Match type'].str.contains('phrase', case=False), 'Match type'] = 'phrase'
+    df1['Search term'] = np.where(df1['Match type'].str.contains('exact', case=False),
+                                  '[' + df1['Search term'] + ']', df1['Search term'])
+    df1['Search term'] = np.where(df1['Match type'].str.contains('phrase', case=False),
+                                  '"' + df1['Search term'] + '"', df1['Search term'])
     df1.loc[df1['Added/Excluded'].str.contains('added', case=False), 'Added/Excluded'] = True
     df1.loc[~df1['Added/Excluded'].str.contains('excluded', case=False), 'Added/Excluded'] = False
     df1['created_time'] = datetime.datetime.now()
@@ -163,17 +167,17 @@ def parse_search_term(df1):
 
     # insert to search table
     keyword_df = pd.DataFrame(conn('default').query(Keyword.id, Keyword.word), columns=['keyword_id', 'Search term'])
-    search_df = pd.DataFrame(conn('default').query(SearchKeyword.id, SearchKeyword.keyword_id),
-                             columns=['id', 'keyword_id'])
+    search_df = pd.DataFrame(conn('default').query(SearchKeyword.id, SearchKeyword.keyword_id, SearchKeyword.ad_group_id),
+                             columns=['id', 'keyword_id', 'ad_group_id'])
     adgroup_df = pd.DataFrame(conn('default').query(AdGroup.id, AdGroup.name), columns=['ad_group_id', 'Ad group'])
     search_insert = pd.merge(df1, keyword_df, how='left', on=["Search term"])
     search_insert.drop_duplicates(inplace=True)
-    search_insert = pd.merge(search_insert, search_df, how='left', on=["keyword_id"])
-    search_insert.drop_duplicates(inplace=True)
     search_insert = pd.merge(search_insert, adgroup_df, how='left', on=['Ad group'])
     search_insert.drop_duplicates(inplace=True)
+    search_insert = pd.merge(search_insert, search_df, how='left', on=["keyword_id", "ad_group_id"])
+    search_insert.drop_duplicates(inplace=True)
     search_insert = search_insert[['id', 'keyword_id', 'ad_group_id', 'created_time']]
-    search_insert.fillna(value='', inplace=True)
+    search_insert = search_insert.replace({np.nan: None})
     search_insert.drop_duplicates(inplace=True)
     for item in chunks(search_insert.to_dict('record'), 10000):
         update_on_dupkey_search(SearchKeyword, item)
